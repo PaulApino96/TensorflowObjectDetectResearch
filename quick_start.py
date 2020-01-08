@@ -7,6 +7,15 @@ import tensorflow as tf
 import zipfile
 import pathlib
 
+# Imports for display
+import cv2
+import time
+import argparse
+import multiprocessing
+
+# from utils.app_utils import FPS, WebcamVideoStream, HLSVideoStream
+# from multiprocessing import Queue, Pool
+
 from collections import defaultdict
 from io import StringIO
 from matplotlib import pyplot as plt
@@ -39,13 +48,13 @@ def load_model(model_name):
 PATH_TO_LABELS = 'research/object_detection/data/mscoco_label_map.pbtxt'
 category_index = label_map_util.create_category_index_from_labelmap(PATH_TO_LABELS, use_display_name=True)
 
-PATH_TO_TEST_IMAGES_DIR = pathlib.Path('research/object_detection/test_images')
-TEST_IMAGE_PATHS = sorted(list(PATH_TO_TEST_IMAGES_DIR.glob("*.jpg")))
+# PATH_TO_TEST_IMAGES_DIR = pathlib.Path('research/object_detection/test_images')
+# TEST_IMAGE_PATHS = sorted(list(PATH_TO_TEST_IMAGES_DIR.glob("*.jpg")))
 
 model_name = 'ssd_mobilenet_v1_coco_2017_11_17'
 detection_model = load_model(model_name)
 
-print(detection_model.inputs)
+# print(detection_model.inputs)
 
 def run_inference_for_single_image(model, image):
   image = np.asarray(image)
@@ -80,10 +89,10 @@ def run_inference_for_single_image(model, image):
     
   return output_dict
 
-def show_inference(model, image_path):
+def show_inference(model, image_raw):
   # the array based representation of the image will be used later in order to prepare the
   # result image with boxes and labels on it.
-  image_np = np.array(Image.open(image_path))
+  image_np = np.array(image_raw)
   # Actual detection.
   output_dict = run_inference_for_single_image(model, image_np)
   # Visualization of the results of a detection.
@@ -97,8 +106,37 @@ def show_inference(model, image_path):
       use_normalized_coordinates=True,
       line_thickness=8)
 
-  # display(Image.fromarray(image_np))
-  Image.fromarray(image_np).save(os.path.join('./', os.path.basename(image_path)))
+  pil_img = Image.fromarray(image_np).convert('RGB')
+  return np.array(pil_img)
 
-for image_path in TEST_IMAGE_PATHS:
-    show_inference(detection_model, image_path)
+  # display(Image.fromarray(image_np))
+  # Image.fromarray(image_np).save(os.path.join('./', os.path.basename(image_path)))
+
+# for image_path in TEST_IMAGE_PATHS:
+#     show_inference(detection_model, image_path)
+
+cv2.namedWindow("preview")
+vc = cv2.VideoCapture(0)
+
+if vc.isOpened(): # try to get the first frame
+    rval, frame = vc.read()
+else:
+    rval = False
+
+frame_rate = 10
+prev_time = 0
+
+while rval:
+  time_elapsed = time.time() - prev_time
+  rval, frame = vc.read()
+
+  if time_elapsed > 1. / frame_rate:
+    prev_time = time.time()
+    frame = show_inference(detection_model, frame)
+    cv2.imshow("preview", frame)
+
+  key = cv2.waitKey(20)
+  if key == 27: # exit on ESC
+    break
+
+cv2.destroyWindow("preview")
